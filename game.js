@@ -1,140 +1,91 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// Player settings
-const playerSize = { width: 40, height: 40 };
-const groundLevel = 360; // Ground y-position
+// Set canvas size to full screen
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-const players = [
-  { 
-    x: 100, y: groundLevel, color: 'blue', hp: 100, 
-    left: 'a', right: 'd', jump: 'w', shoot: 'f', 
-    vy: 0, isJumping: false, bullets: [] 
-  },
-  { 
-    x: 660, y: groundLevel, color: 'red', hp: 100, 
-    left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', shoot: 'm', 
-    vy: 0, isJumping: false, bullets: [] 
-  }
-];
+const player = {
+  x: canvas.width / 2,
+  y: canvas.height - 150,
+  width: 50,
+  height: 50,
+  speed: 5,
+  jumpPower: 10,
+  velocityY: 0,
+  isJumping: false,
+  color: 'red'
+};
 
-const bulletSpeed = 5;
+let leftPressed = false;
+let rightPressed = false;
+let jumpPressed = false;
+
 const gravity = 0.5;
-const jumpForce = -10;
 
-const keys = {};
+function drawPlayer() {
+  ctx.fillStyle = player.color;
+  ctx.fillRect(player.x, player.y, player.width, player.height);
+}
 
-document.addEventListener('keydown', (e) => keys[e.key] = true);
-document.addEventListener('keyup', (e) => keys[e.key] = false);
+function movePlayer() {
+  if (leftPressed) {
+    player.x -= player.speed;
+  }
+  if (rightPressed) {
+    player.x += player.speed;
+  }
+  if (jumpPressed && !player.isJumping) {
+    player.velocityY = -player.jumpPower;
+    player.isJumping = true;
+  }
 
-function shoot(playerIndex) {
-  const player = players[playerIndex];
-  const direction = (playerIndex === 0) ? 1 : -1;
-  player.bullets.push({ x: player.x + playerSize.width / 2, y: player.y + playerSize.height / 2, dir: direction });
+  player.velocityY += gravity;
+  player.y += player.velocityY;
+
+  // Prevent player from going off-screen
+  if (player.x < 0) {
+    player.x = 0;
+  }
+  if (player.x + player.width > canvas.width) {
+    player.x = canvas.width - player.width;
+  }
+  if (player.y + player.height > canvas.height) {
+    player.y = canvas.height - player.height;
+    player.isJumping = false;
+    player.velocityY = 0;
+  }
+}
+
+function handleTouchControls() {
+  document.getElementById('moveLeft').addEventListener('touchstart', () => {
+    leftPressed = true;
+  });
+  document.getElementById('moveLeft').addEventListener('touchend', () => {
+    leftPressed = false;
+  });
+
+  document.getElementById('moveRight').addEventListener('touchstart', () => {
+    rightPressed = true;
+  });
+  document.getElementById('moveRight').addEventListener('touchend', () => {
+    rightPressed = false;
+  });
+
+  document.getElementById('jumpButton').addEventListener('touchstart', () => {
+    jumpPressed = true;
+  });
+  document.getElementById('jumpButton').addEventListener('touchend', () => {
+    jumpPressed = false;
+  });
 }
 
 function update() {
-  players.forEach((player, index) => {
-    // Left and right movement
-    if (keys[player.left]) player.x -= 3;
-    if (keys[player.right]) player.x += 3;
-
-    // Jump
-    if (keys[player.jump] && !player.isJumping) {
-      player.vy = jumpForce;
-      player.isJumping = true;
-    }
-
-    // Apply gravity
-    player.vy += gravity;
-    player.y += player.vy;
-
-    // Landing on ground
-    if (player.y >= groundLevel) {
-      player.y = groundLevel;
-      player.vy = 0;
-      player.isJumping = false;
-    }
-
-    // Keep players within canvas horizontally
-    player.x = Math.max(0, Math.min(canvas.width - playerSize.width, player.x));
-
-    // Shoot bullets
-    if (keys[player.shoot]) {
-      if (!player.shootCooldown) {
-        shoot(index);
-        player.shootCooldown = 20; // frames between shots
-      }
-    }
-
-    if (player.shootCooldown) player.shootCooldown--;
-
-    // Move bullets
-    player.bullets.forEach(bullet => bullet.x += bulletSpeed * bullet.dir);
-
-    // Bullet collision
-    player.bullets.forEach((bullet, bIndex) => {
-      const opponent = players[1 - index];
-      if (bullet.x > opponent.x && bullet.x < opponent.x + playerSize.width &&
-          bullet.y > opponent.y && bullet.y < opponent.y + playerSize.height) {
-        opponent.hp -= 10;
-        player.bullets.splice(bIndex, 1);
-      }
-    });
-
-    // Remove off-screen bullets
-    player.bullets = player.bullets.filter(bullet => bullet.x > 0 && bullet.x < canvas.width);
-  });
-}
-
-function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // Draw ground
-  ctx.fillStyle = 'green';
-  ctx.fillRect(0, groundLevel + playerSize.height, canvas.width, canvas.height - groundLevel);
-
-  // Draw players
-  players.forEach(player => {
-    ctx.fillStyle = player.color;
-    ctx.fillRect(player.x, player.y, playerSize.width, playerSize.height);
-  });
-
-  // Draw bullets
-  players.forEach(player => {
-    player.bullets.forEach(bullet => {
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(bullet.x, bullet.y, 5, 5);
-    });
-  });
-
-  // Draw health bars
-  ctx.fillStyle = 'blue';
-  ctx.fillRect(20, 20, players[0].hp * 2, 20);
-  ctx.fillStyle = 'red';
-  ctx.fillRect(560, 20, players[1].hp * 2, 20);
-
-  // Draw text
-  ctx.fillStyle = '#fff';
-  ctx.font = '20px Arial';
-  ctx.fillText(`Player 1 HP: ${players[0].hp}`, 20, 60);
-  ctx.fillText(`Player 2 HP: ${players[1].hp}`, 560, 60);
+  movePlayer();
+  drawPlayer();
+  requestAnimationFrame(update);
 }
 
-function gameLoop() {
-  update();
-  draw();
-
-  // Check win condition
-  if (players[0].hp <= 0) {
-    alert('Player 2 Wins!');
-    window.location.reload();
-  } else if (players[1].hp <= 0) {
-    alert('Player 1 Wins!');
-    window.location.reload();
-  } else {
-    requestAnimationFrame(gameLoop);
-  }
-}
-
-gameLoop();
+handleTouchControls();
+update();
